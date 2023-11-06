@@ -17,17 +17,31 @@ interface ISwapRouterV2 {
 }
 
 interface ISwapRouterV3 {
-	function exactInputSingle(
-		address tokenIn,
-		address tokenOut,
-		uint24 fee,
-		address recipient,
-		uint deadline,
-		uint amountIn,
-		uint amountOutMinimum,
-		uint160 sqrtPriceLimitX96
-	) external;
+	struct ExactInputSingleParams {
+		address tokenIn;
+		address tokenOut;
+		uint24 fee;
+		address recipient;
+		uint amountIn;
+		uint amountOutMinimum;
+		uint160 sqrtPriceLimitX96;
+	}
+	function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint amountOut);
 }
+
+// interface ISwapRouterV3Old {
+// 	struct ExactInputSingleParams {
+// 		address tokenIn;
+// 		address tokenOut;
+// 		uint24 fee;
+// 		address recipient;
+// 		uint deadline;
+// 		uint amountIn;
+// 		uint amountOutMinimum;
+// 		uint160 sqrtPriceLimitX96;
+// 	}
+// 	function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint amountOut);
+// }
 
 interface IERC20Extended is IERC20 {
 	function decimals() external view returns (uint8);
@@ -46,6 +60,7 @@ contract ArbiCrypto is Ownable {
 	enum PoolType {
 		UNISWAP_V2,
 		UNISWAP_V3
+//		UNISWAP_V3_OLD
 	}
 
 	struct Pool {
@@ -131,21 +146,27 @@ contract ArbiCrypto is Ownable {
 	}
 
 	function swap(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _revert) external onlyOwner returns (uint256 amountOut) {
-		address[] memory path;
+		address[] memory path = new address[](2);
 		if (_zeroForOne) {
-			path[0] = _pool.token0;
-			path[1] = _pool.token1;
-		} else {
 			path[0] = _pool.token1;
 			path[1] = _pool.token0;
+		} else {
+			path[0] = _pool.token0;
+			path[1] = _pool.token1;
 		}
+
+		IERC20(path[0]).forceApprove(_pool.router, type(uint256).max);
 
 		uint256 balanceBeforeSwap = IERC20(path[1]).balanceOf(address(this));
 
 		if (_pool.poolType == PoolType.UNISWAP_V2) {
 			ISwapRouterV2(_pool.router).swapExactTokensForTokensSupportingFeeOnTransferTokens(_amountIn, 0, path, address(this), block.timestamp + 60);
 		} else if (_pool.poolType == PoolType.UNISWAP_V3) {
-			ISwapRouterV3(_pool.router).exactInputSingle(path[0], path[1], _pool.fee, address(this), block.timestamp + 60, _amountIn, 0, 0);
+			ISwapRouterV3.ExactInputSingleParams memory params = ISwapRouterV3.ExactInputSingleParams(path[0], path[1], _pool.fee, address(this), _amountIn, 0, 0);
+			ISwapRouterV3(_pool.router).exactInputSingle(params);
+		// } else if (_pool.poolType == PoolType.UNISWAP_V3_OLD) {
+		// 	ISwapRouterV3Old.ExactInputSingleParams memory params = ISwapRouterV3Old.ExactInputSingleParams(path[0], path[1], _pool.fee, address(this), block.timestamp + 60, _amountIn, 0, 0);
+		// 	ISwapRouterV3Old(_pool.router).exactInputSingle(params);
 		} else {
 			revert("PoolType not supported");
 		}
@@ -158,8 +179,8 @@ contract ArbiCrypto is Ownable {
 	}
 
 	function getBook(Pool calldata _pool, bool _zeroForOne) external returns (Book memory) {
-		IERC20(_pool.token0).safeIncreaseAllowance(_pool.router, type(uint256).max);
-		IERC20(_pool.token1).safeIncreaseAllowance(_pool.router, type(uint256).max);
+		IERC20(_pool.token0).forceApprove(_pool.router, type(uint256).max);
+		IERC20(_pool.token1).forceApprove(_pool.router, type(uint256).max);
 
         uint8 tokenInDecimals;
 		uint8 tokenOutDecimals;
