@@ -249,7 +249,8 @@ describe("ArbiCrypto contract Unit Tests", function () {
         // const poolFee = 500;
         // const poolType = 1; //"UNISWAP_V3";
         // const compiler = "SOLIDITY";
-        // const balanceSlot = 3;
+        // const token0BalanceSlot = 3;
+        // const token1BalanceSlot = 2;
 
 
         const poolContract = "0xa7BC6c09907fa2ded89F1c8D05374621cB1F88c5"
@@ -295,9 +296,9 @@ describe("ArbiCrypto contract Unit Tests", function () {
 
         
       //  const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400], 100000000]);
-        const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [5, 10, 15], 100000000]);
- //       const newBalance = BigInt(ethers.MaxUint256.toString()) / BigInt(2);
-        const newBalance = ethers.MaxUint256;
+        const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [1, 3, 5, 10, 15], 10000000]);
+        const newBalance = BigInt(ethers.MaxUint256.toString()) / BigInt(2);
+ //       const newBalance = ethers.MaxUint256;
         const token0BalanceSlotHex = ethers.toBeHex(token0BalanceSlot, 32);
         const token1BalanceSlotHex = ethers.toBeHex(token1BalanceSlot, 32);
         const address = ethers.toBeHex(arbicrypto.target, 32);
@@ -315,7 +316,7 @@ describe("ArbiCrypto contract Unit Tests", function () {
             "latest",
             {
                 [tokenInContract]: {"stateDiff": {[token0Index]: ethers.toQuantity(newBalance)}},
-       //         [tokenOutContract] : {"stateDiff": {[token1Index]: ethers.toQuantity(newBalance)}}
+                [tokenOutContract] : {"stateDiff": {[token1Index]: ethers.toQuantity(newBalance)}}
             }
           ];
         

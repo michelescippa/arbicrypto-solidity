@@ -77,10 +77,12 @@ contract ArbiCrypto is Ownable {
 	}
 
 	struct Book {
-		uint[] askprice;
-		uint[] askvolume;
-		uint[] bidprice;
-		uint[] bidvolume;
+		uint[] askPrice;
+		uint[] askVolumeIn;
+		uint[] askVolumeOut;
+		uint[] bidPrice;
+		uint[] bidVolumeIn;
+		uint[] bidVolumeOut;
 	}
 
 	constructor() Ownable(address(msg.sender)) {}
@@ -226,7 +228,6 @@ contract ArbiCrypto is Ownable {
 		IERC20(_pool.token0).forceApprove(_pool.router, type(uint256).max);
 		IERC20(_pool.token1).forceApprove(_pool.router, type(uint256).max);
 
-
 		// AsksBook
 
 		uint8 tokenInDecimals;
@@ -240,71 +241,65 @@ contract ArbiCrypto is Ownable {
 			tokenOutDecimals = _pool.token1Decimals;
 		}
 
-		uint256 amountIn = 10 ** tokenInDecimals;
-		uint256 amountOut = swapWithRevert(_pool, _zeroForOne, amountIn, false);
+		uint256 amountIn = 1 * (10 ** tokenOutDecimals);
+		uint256 amountOut = swapWithRevert(_pool, !_zeroForOne, amountIn, false);
 
-		console.log("amountOut:", amountOut);
-
-		uint256 ticker = getPrice(amountIn, amountOut, tokenInDecimals, tokenOutDecimals);
-
-		console.log("ticker: ", ticker);
+		uint256 ticker = getPrice18Decimals(amountIn, amountOut, tokenInDecimals, tokenOutDecimals);
 
 		uint256 targetPrice;
 		uint256 rightLimit = 0;
 
 		Book memory book;
 
-		book.askprice = new uint256[](_increments.length);
-		book.askvolume = new uint256[](_increments.length);
-		
+		book.askPrice = new uint256[](_increments.length);
+		book.askVolumeIn = new uint256[](_increments.length);
+		book.askVolumeOut = new uint256[](_increments.length);
+
+		for (uint i = 0; i < _increments.length; i++) {
+			targetPrice = incrementPriceByPercent(ticker, _increments[i]);
+
+			(amountIn, amountOut, rightLimit) = getAmountIn(_pool, !_zeroForOne, targetPrice, false, rightLimit);
+
+			book.askPrice[i] = targetPrice;
+			book.askVolumeIn[i] = amountIn;
+			book.askVolumeOut[i] = amountOut;
+
+			if (amountIn > _maxTokenOut * (10 ** tokenOutDecimals)) {
+				break;
+			}
+		}
+
+		// BidsBook
+		amountIn = (10 ** tokenInDecimals);
+
+		amountOut = 1;
+		while (amountOut < (10 ** tokenOutDecimals)) {
+			amountIn *= 10;
+			amountOut = swapWithRevert(_pool, _zeroForOne, amountIn, false);
+		}
+
+		ticker = getPrice18Decimals(amountIn, amountOut, tokenOutDecimals, tokenInDecimals);
+
+		rightLimit = amountIn;
+
+		book.bidPrice = new uint256[](_increments.length);
+		book.bidVolumeIn = new uint256[](_increments.length);
+		book.bidVolumeOut = new uint256[](_increments.length);
+
 		for (uint i = 0; i < _increments.length; i++) {
 			targetPrice = incrementPriceByPercent(ticker, _increments[i]);
 
 			(amountIn, amountOut, rightLimit) = getAmountIn(_pool, _zeroForOne, targetPrice, false, rightLimit);
 
-			book.askprice[i] = targetPrice;
-			book.askvolume[i] = amountIn;
+			book.bidPrice[i] = getPrice18Decimals(amountOut, amountIn, tokenInDecimals, tokenOutDecimals);
+			book.bidVolumeIn[i] = amountOut;
+			book.bidVolumeOut[i] = amountIn;
 
 			if (amountOut >  _maxTokenOut * (10 ** tokenOutDecimals)) {
 				break;
 			}
 		}
 
-		// // BidsBook
-
-		// if (_zeroForOne) {
-		// 	tokenInDecimals = _pool.token0Decimals;
-		// 	tokenOutDecimals = _pool.token1Decimals;
-		// } else {
-		// 	tokenInDecimals = _pool.token1Decimals;
-		// 	tokenOutDecimals = _pool.token0Decimals;
-		// }
-
-		// amountIn = 10 ** tokenInDecimals;
-		// amountOut = swapWithRevert(_pool, !_zeroForOne, amountIn, false);
-		// ticker = getPrice(amountIn, amountOut, tokenInDecimals, tokenOutDecimals);
-		
-		// rightLimit = 0;
-
-		// book.bidprice = new uint256[](_increments.length);
-		// book.bidvolume = new uint256[](_increments.length);
-
-		// for (uint i = 0; i < _increments.length; i++) {
-		// 	targetPrice = incrementPriceByPercent(ticker, _increments[i]);
-
-		// 	(amountIn, amountOut, rightLimit) = getAmountIn(_pool, !_zeroForOne, targetPrice, false, rightLimit);
-
-		// 	book.bidprice[i] = targetPrice;
-		// 	book.bidvolume[i] = amountIn;
-
-		// 	if (amountIn >  _maxTokenOut * (10 ** tokenInDecimals)) {
-		// 		break;
-		// 	}
-		// }
-
-
-
-		console.log("gas resido finale:", gasleft());
 		return book;
 	}
 
@@ -321,12 +316,12 @@ contract ArbiCrypto is Ownable {
 
 		if (_initialRight > 0) {
 			rightMax = _initialRight;
-		}
-		else {
+		} else {
 			rightMax = 10 ** tokenInDecimals;
 		}
-		
+
 		uint256 maxAmount = type(uint256).max / (10 ** tokenInDecimals);
+		uint256 newRight;
 
 		while (true) {
 			if (rightMax > maxAmount) {
@@ -335,13 +330,23 @@ contract ArbiCrypto is Ownable {
 			}
 
 			uint256 out = swapWithRevert(_pool, _zeroForOne, rightMax, _approve);
-			uint256 price = getPrice(rightMax, out, tokenInDecimals, tokenOutDecimals);
+
+			if (out == 1) {
+				newRight = rightMax * 10;
+				if (newRight / 10 != rightMax) {
+					rightMax = maxAmount;
+				} else {
+					rightMax = newRight;
+				}
+			}
+
+			uint256 price = getPrice18Decimals(rightMax, out, tokenOutDecimals, tokenInDecimals);
 
 			if (price > _targetPrice || rightMax == maxAmount) {
 				break;
 			}
 
-			uint256 newRight = rightMax * 10;
+			newRight = rightMax * 10;
 			if (newRight / 10 != rightMax) {
 				rightMax = maxAmount;
 			} else {
@@ -353,12 +358,11 @@ contract ArbiCrypto is Ownable {
 
 		uint256 tolerance = 10 ** tokenInDecimals;
 
-		
 		while (right - left > tolerance) {
 			uint256 mid = left + (right - left) / 2;
 
 			amountOut = swapWithRevert(_pool, _zeroForOne, mid, _approve);
-			uint256 price = getPrice(mid, amountOut, tokenInDecimals, tokenOutDecimals);
+			uint256 price = getPrice18Decimals(mid, amountOut, tokenOutDecimals, tokenInDecimals);
 
 			if (price > _targetPrice) {
 				right = mid;
@@ -369,12 +373,12 @@ contract ArbiCrypto is Ownable {
 		amountIn = left + (right - left) / 2;
 	}
 
-	function getPrice(
+	function getPrice18Decimals(
 		uint256 tokenInAmount,
 		uint256 tokenOutAmount,
 		uint8 tokenInDecimals,
 		uint8 tokenOutDecimals
-	) internal pure returns (uint256 priceInTokenIn) {
+	) internal pure returns (uint256) {
 		require(tokenInAmount != 0, "Token in amount cannot be zero");
 		require(tokenOutAmount != 0, "Token out amount cannot be zero");
 
@@ -398,8 +402,7 @@ contract ArbiCrypto is Ownable {
 		require(scaledTokenInAmount / scaleFactor == adjustedTokenInAmount, "Overflow in scaling tokenIn decimals");
 
 		uint256 scaledPrice = scaledTokenInAmount / adjustedTokenOutAmount;
-		priceInTokenIn = scaledPrice / adjustFactor;
-		return priceInTokenIn;
+		return scaledPrice;
 	}
 
 	function incrementPriceByPercent(uint256 price, uint256 percentIncrement) internal pure returns (uint256 incrementedPrice) {
