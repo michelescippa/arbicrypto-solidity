@@ -89,7 +89,7 @@ describe("ArbiCrypto contract Unit Tests", function () {
         }
 
         
-        const callData = arbicrypto.interface.encodeFunctionData("swap", [Pool, zeroForOne, BigInt(1 * (10 ** tokenInDecimals)), false, true]);
+        const callData = arbicrypto.interface.encodeFunctionData("swap", [Pool, zeroForOne, BigInt(1 * (10 ** tokenInDecimals)), 0, false, true]);
         const newBalance = BigInt(1000000 * (10 ** tokenInDecimals)); //ethers.MaxUint256;
         const balanceSlotHex = ethers.toBeHex(balanceSlot, 32);
         const address = ethers.toBeHex(arbicrypto.target, 32);
@@ -111,70 +111,70 @@ describe("ArbiCrypto contract Unit Tests", function () {
         console.log("Tokens out: " + (ethers.getNumber(ethCall) / 10 ** tokenOutDecimals));
     });
 
-    it("SwapWithoutRevert with stateDiff, testing with WETH/USDT", async function () {
-        const poolContract = "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852"
-        const token0Contract = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-        const token0Decimals = 18;
-        const token1Contract = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-        const token1Decimals = 6;
-        const routerContract = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
-        const poolFee = 500;
-        const poolType = 0; //"UNISWAP_V3";
-        const compiler = "SOLIDITY";
-        const balanceSlot = 3;
+    // it("SwapWithoutRevert with stateDiff, testing with WETH/USDT", async function () {
+    //     const poolContract = "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852"
+    //     const token0Contract = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    //     const token0Decimals = 18;
+    //     const token1Contract = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+    //     const token1Decimals = 6;
+    //     const routerContract = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
+    //     const poolFee = 500;
+    //     const poolType = 0; //"UNISWAP_V3";
+    //     const compiler = "SOLIDITY";
+    //     const balanceSlot = 3;
 
-        const Pool = {
-            poolType: poolType,
-            poolAddress: poolContract,
-            token0: token0Contract,
-            token0Decimals: token0Decimals,
-            token1: token1Contract,
-            token1Decimals: token1Decimals,
-            fee: poolFee,
-            router: routerContract
-        };
+    //     const Pool = {
+    //         poolType: poolType,
+    //         poolAddress: poolContract,
+    //         token0: token0Contract,
+    //         token0Decimals: token0Decimals,
+    //         token1: token1Contract,
+    //         token1Decimals: token1Decimals,
+    //         fee: poolFee,
+    //         router: routerContract
+    //     };
 
-        const zeroForOne = false;
+    //     const zeroForOne = false;
 
-        let tokenInContract;
-        let tokenInDecimals;
-        let tokenOutDecimals;
-        if (zeroForOne) {
-            tokenInContract = token1Contract;
-            tokenInDecimals = token1Decimals;
-            tokenOutDecimals = token0Decimals;
-        } else {
-            tokenInContract = token0Contract;
-            tokenInDecimals = token0Decimals;
-            tokenOutDecimals = token1Decimals;
-        }
+    //     let tokenInContract;
+    //     let tokenInDecimals;
+    //     let tokenOutDecimals;
+    //     if (zeroForOne) {
+    //         tokenInContract = token1Contract;
+    //         tokenInDecimals = token1Decimals;
+    //         tokenOutDecimals = token0Decimals;
+    //     } else {
+    //         tokenInContract = token0Contract;
+    //         tokenInDecimals = token0Decimals;
+    //         tokenOutDecimals = token1Decimals;
+    //     }
 
         
-        const callData = arbicrypto.interface.encodeFunctionData("swapWithoutRevert", [Pool, zeroForOne,  BigInt(1 * (10 ** tokenInDecimals)), true]);
-        const newBalance =  BigInt(1000000 * (10 ** tokenInDecimals)); //ethers.MaxUint256;
-        const balanceSlotHex = ethers.toBeHex(balanceSlot, 32);
-        const address = ethers.toBeHex(arbicrypto.target, 32);
+    //     const callData = arbicrypto.interface.encodeFunctionData("swapWithoutRevert", [Pool, zeroForOne,  BigInt(1 * (10 ** tokenInDecimals)), true]);
+    //     const newBalance =  BigInt(1000000 * (10 ** tokenInDecimals)); //ethers.MaxUint256;
+    //     const balanceSlotHex = ethers.toBeHex(balanceSlot, 32);
+    //     const address = ethers.toBeHex(arbicrypto.target, 32);
 
-        const index = compiler == "SOLIDITY" ?  ethers.keccak256("0x" + address.substring(2) + balanceSlotHex.substring(2)) :  ethers.keccak256("0x" + balanceSlotHex.substring(2) + address.substring(2));
+    //     const index = compiler == "SOLIDITY" ?  ethers.keccak256("0x" + address.substring(2) + balanceSlotHex.substring(2)) :  ethers.keccak256("0x" + balanceSlotHex.substring(2) + address.substring(2));
 
-        const params = [
-            {
-              from: owner.address,
-              to: arbicrypto.target,
-              data: callData,
-            },
-            "latest",
-            {[tokenInContract]: {"stateDiff": {[index]: ethers.toQuantity(newBalance)}} }
-          ];
+    //     const params = [
+    //         {
+    //           from: owner.address,
+    //           to: arbicrypto.target,
+    //           data: callData,
+    //         },
+    //         "latest",
+    //         {[tokenInContract]: {"stateDiff": {[index]: ethers.toQuantity(newBalance)}} }
+    //       ];
         
-        const ethCall = await network.provider.send("eth_call", params);
+    //     const ethCall = await network.provider.send("eth_call", params);
 
-        console.log("Tokens out: " + (ethers.getNumber(ethCall) / 10 ** tokenOutDecimals));
+    //     console.log("Tokens out: " + (ethers.getNumber(ethCall) / 10 ** tokenOutDecimals));
 
-        expect(ethers.getNumber(ethCall)).to.not.equal(0);
-    });
+    //     expect(ethers.getNumber(ethCall)).to.not.equal(0);
+    // });
 
-    it("SwapWithRevert with stateDiff, testing with WETH/USDT", async function () {
+    it("Quote with stateDiff, testing with WETH/USDT", async function () {
         const poolContract = "0x11b815efB8f581194ae79006d24E0d814B7697F6"
         const token0Contract = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
         const token0Decimals = 18;
@@ -215,7 +215,7 @@ describe("ArbiCrypto contract Unit Tests", function () {
         const amountIn = BigInt(8750000000000000000000);
         
      //   const callData = arbicrypto.interface.encodeFunctionData("swapWithRevert", [Pool, zeroForOne,  BigInt(100 * (10 ** tokenInDecimals)), true]);
-        const callData = arbicrypto.interface.encodeFunctionData("swapWithRevert", [Pool, zeroForOne,  amountIn, true]);
+        const callData = arbicrypto.interface.encodeFunctionData("quote", [Pool, zeroForOne,  amountIn, true]);
         const newBalance =  BigInt(1000000 * (10 ** tokenInDecimals)); //ethers.MaxUint256;
         const balanceSlotHex = ethers.toBeHex(balanceSlot, 32);
         const address = ethers.toBeHex(arbicrypto.target, 32);
@@ -296,7 +296,7 @@ describe("ArbiCrypto contract Unit Tests", function () {
 
         
       //  const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 200, 300, 400], 100000000]);
-        const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [1, 3, 5, 10, 15], 10000000]);
+        const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [1, 3, 5], 10000000]);
         const newBalance = BigInt(ethers.MaxUint256.toString()) / BigInt(2);
  //       const newBalance = ethers.MaxUint256;
         const token0BalanceSlotHex = ethers.toBeHex(token0BalanceSlot, 32);
@@ -321,6 +321,8 @@ describe("ArbiCrypto contract Unit Tests", function () {
           ];
         
         const ethCall = await network.provider.send("eth_call", params);
+        
+        console.log(ethCall);
 
         const decodedResult = arbicrypto.interface.decodeFunctionResult("getBook", ethCall);
 
