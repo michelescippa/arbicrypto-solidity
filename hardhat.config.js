@@ -1,5 +1,8 @@
 require("@nomicfoundation/hardhat-toolbox");
 
+const QUICKNODE_API_KEY = ""; // QUICKNODE_API_KEY
+const PRIVATE_KEY = ""; // PRIVATE_KEY
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
 //  solidity: "0.8.20",
@@ -17,9 +20,13 @@ module.exports = {
     hardhat: {
       blockGasLimit: 500000000,
       forking: {
-        url: "https://quick-capable-dinghy.quiknode.pro/cb4404b6a100ea95db99a0bcf3eafd3184772bcf/",
+        url: `https://quick-capable-dinghy.quiknode.pro/${QUICKNODE_API_KEY}`,
         blockNumber: 18576359
       }
+    },
+    ethereum: {
+      url: `https://quick-capable-dinghy.quiknode.pro/${QUICKNODE_API_KEY}`,
+      accounts: [PRIVATE_KEY]
     }
   }
 };
