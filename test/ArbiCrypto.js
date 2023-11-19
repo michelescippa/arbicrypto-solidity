@@ -89,7 +89,7 @@ describe("ArbiCrypto contract Unit Tests", function () {
         }
 
         
-        const callData = arbicrypto.interface.encodeFunctionData("swap", [Pool, zeroForOne, BigInt(1 * (10 ** tokenInDecimals)), 0, false, true]);
+        const callData = arbicrypto.interface.encodeFunctionData("swap", [Pool, zeroForOne, BigInt(1 * (10 ** tokenInDecimals)), 0]);
         const newBalance = BigInt(1000000 * (10 ** tokenInDecimals)); //ethers.MaxUint256;
         const balanceSlotHex = ethers.toBeHex(balanceSlot, 32);
         const address = ethers.toBeHex(arbicrypto.target, 32);
@@ -108,7 +108,9 @@ describe("ArbiCrypto contract Unit Tests", function () {
         
         const ethCall = await network.provider.send("eth_call", params);
 
-        console.log("Tokens out: " + (ethers.getNumber(ethCall) / 10 ** tokenOutDecimals));
+        expect(ethers.getNumber(ethCall)).to.equal(1);
+
+ //       console.log("Tokens out: " + (ethers.getNumber(ethCall) / 10 ** tokenOutDecimals));
     });
 
     // it("SwapWithoutRevert with stateDiff, testing with WETH/USDT", async function () {
@@ -322,7 +324,7 @@ describe("ArbiCrypto contract Unit Tests", function () {
         
         const ethCall = await network.provider.send("eth_call", params);
         
-        console.log(ethCall);
+    //    console.log(ethCall);
 
         const decodedResult = arbicrypto.interface.decodeFunctionResult("getBook", ethCall);
 

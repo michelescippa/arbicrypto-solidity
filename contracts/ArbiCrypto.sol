@@ -51,9 +51,9 @@ interface IERC20Extended is IERC20 {
 	function decimals() external view returns (uint8);
 }
 
-interface ArbiSwap {
-	function swap(ArbiCrypto.Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, uint256 _minAmountOut, bool _revert) external returns (uint256);
-}
+// interface ArbiSwap {
+// 	function swap(ArbiCrypto.Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, uint256 _minAmountOut, bool _revert) external returns (uint256);
+// }
 
 contract ArbiCrypto is Ownable {
 	using SafeERC20 for IERC20;
@@ -192,8 +192,8 @@ contract ArbiCrypto is Ownable {
 		(success, ) = address(this).delegatecall(data);
 	}
 
-	function swapAndTransfer(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, uint256 _minAmountOut, address _recipient) public onlyOwner {
-		bool success = swap(_pool, _zeroForOne, _amountIn, _minAmountOut);
+	function swapAndTransfer(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, uint256 _minAmountOut, address _recipient) public onlyOwner returns (bool success) {
+		success = swap(_pool, _zeroForOne, _amountIn, _minAmountOut);
 
 		if (success) {
 			address tokenOut;
@@ -201,6 +201,28 @@ contract ArbiCrypto is Ownable {
 				tokenOut = _pool.token0;
 			} else {
 				tokenOut = _pool.token1;
+			}
+			transferToken(tokenOut, _recipient);
+		}
+	}
+
+	function convertAndSwap(Pool calldata _convertPool, bool _zeroForOneConvert, Pool calldata _swapPool, bool _zeroForOneSwap, uint256 _amountIn, uint256 _minAmountOutConvert, uint256 _minAmountOutSwap) public onlyOwner returns (bool success) {
+		success = swap(_convertPool, _zeroForOneConvert, _amountIn, _minAmountOutConvert);
+		if (success) {
+			address tokenOut = _zeroForOneConvert ? _swapPool.token0 : _swapPool.token1;
+			uint256 balance = getTokenBalance(tokenOut, address(this));
+			success = swap(_swapPool, _zeroForOneSwap, balance, _minAmountOutSwap);
+		}
+	}
+
+	function convertSwapAndTransfer(Pool calldata _convertPool, bool _zeroForOneConvert, Pool calldata _swapPool, bool _zeroForOneSwap, uint256 _amountIn, uint256 _minAmountOutConvert, uint256 _minAmountOutSwap, address _recipient) public onlyOwner returns (bool success) {
+		success = convertAndSwap(_convertPool, _zeroForOneConvert, _swapPool, _zeroForOneSwap, _amountIn, _minAmountOutConvert, _minAmountOutSwap);
+		if (success) {
+			address tokenOut;
+			if (_zeroForOneSwap) {
+				tokenOut = _swapPool.token0;
+			} else {
+				tokenOut = _swapPool.token1;
 			}
 			transferToken(tokenOut, _recipient);
 		}
@@ -533,5 +555,12 @@ contract ArbiCrypto is Ownable {
 		require(incrementedPrice >= price, "Overflow occurred");
 
 		return incrementedPrice;
+	}
+
+	function getContractBalances(address[] calldata _tokens) external view returns (uint256[] memory balances) {
+		balances =  new uint256[](_tokens.length);
+		for (uint256 i = 0; i < _tokens.length; i++) {
+			balances[i] = getTokenBalance(_tokens[i], address(this));
+		}
 	}
 }
