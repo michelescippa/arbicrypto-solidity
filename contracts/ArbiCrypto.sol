@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // Hardhat imports
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 // Uniswap Functions
 interface ISwapRouterV2 {
@@ -44,6 +44,7 @@ interface ISwapRouterV3Old {
 		uint amountOutMinimum;
 		uint160 sqrtPriceLimitX96;
 	}
+
 	function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint amountOut);
 }
 
@@ -73,29 +74,56 @@ contract ArbiCrypto is Ownable {
 
 	constructor() Ownable(address(msg.sender)) {}
 
-	function withdrawToken(address _token) external onlyOwner {
+	function withdrawAllOfToken(address _token) external onlyOwner {
 		uint256 balance = IERC20(_token).balanceOf(address(this));
 		IERC20(_token).transfer(owner(), balance);
 	}
 
-	function withdrawETH() external onlyOwner {
+	function withdrawPartialOfToken(address _token, uint256 _amount) external onlyOwner {
+		IERC20(_token).transfer(owner(), _amount);
+	}
+
+	function withdrawAllOfETH() external onlyOwner {
 		payable(owner()).transfer(address(this).balance);
 	}
 
+	function withdrawPartialOfETH(uint256 _amount) external onlyOwner {
+		payable(owner()).transfer(_amount);
+	}
+
+	function transferAllOfETH(address _recipient) external onlyOwner {
+		payable(_recipient).transfer(address(this).balance);
+	}
+
+	function transferPartialOfETH(address _recipient, uint256 _amount) external onlyOwner {
+		payable(_recipient).transfer(_amount);
+	}
+
+	function transferPartialOfToken(address _token, address _recipient, uint256 _amount) public onlyOwner {
+		IERC20(_token).transfer(_recipient, _amount);
+	}
+
+	// function transferAllOfToken(address _token, address _recipient) public onlyOwner {
+	// 	uint256 balance = IERC20(_token).balanceOf(address(this));
+	// 	IERC20(_token).transfer(_recipient, balance);
+	// }
+
 	function getTokenBalance(address _token, address _address) public view returns (uint256) {
 		return IERC20(_token).balanceOf(_address);
+	}
+
+	function getTokensBalances(address[] calldata _tokens, address _address) external view returns (uint256[] memory balances) {
+		balances = new uint256[](_tokens.length);
+		for (uint256 i = 0; i < _tokens.length; i++) {
+			balances[i] = IERC20(_tokens[i]).balanceOf(_address);
+		}
 	}
 
 	function getTokenDecimals(address _token) public view returns (uint8) {
 		return IERC20Extended(_token).decimals();
 	}
 
-	function transferToken(address _token, address _recipient) public onlyOwner {
-		uint256 balance = IERC20(_token).balanceOf(address(this));
-		IERC20(_token).transfer(_recipient, balance);
-	}
-
-	function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _approve) public onlyOwner returns (uint256) {
+function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _approve) public onlyOwner returns (uint256) {
 		bytes memory data = abi.encodeWithSignature(
 			"swapInternal((uint8,address,address,address,uint8,uint8,uint24,address),bool,uint256,uint256,bool,bool)",
 			_pool,
@@ -151,15 +179,29 @@ contract ArbiCrypto is Ownable {
 		(success, ) = address(this).delegatecall(data);
 	}
 
-	function swapAndTransfer(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, uint256 _minAmountOut, address _recipient) public onlyOwner returns (bool success) {
-		success = swap(_pool, _zeroForOne, _amountIn, _minAmountOut);
-		if (success) {
-			address tokenOut = _zeroForOne ? _pool.token0 : _pool.token1;
-			transferToken(tokenOut, _recipient);
-		}
-	}
+	// function swapAndTransfer(
+	// 	Pool calldata _pool,
+	// 	bool _zeroForOne,
+	// 	uint256 _amountIn,
+	// 	uint256 _minAmountOut,
+	// 	address _recipient
+	// ) public onlyOwner returns (bool success) {
+	// 	success = swap(_pool, _zeroForOne, _amountIn, _minAmountOut);
+	// 	if (success) {
+	// 		address tokenOut = _zeroForOne ? _pool.token0 : _pool.token1;
+	// 		transferAllOfToken(tokenOut, _recipient);
+	// 	}
+	// }
 
-	function convertAndSwap(Pool calldata _convertPool, bool _zeroForOneConvert, Pool calldata _swapPool, bool _zeroForOneSwap, uint256 _amountIn, uint256 _minAmountOutConvert, uint256 _minAmountOutSwap) public onlyOwner returns (bool success) {
+	function convertAndSwap(
+		Pool calldata _convertPool,
+		bool _zeroForOneConvert,
+		Pool calldata _swapPool,
+		bool _zeroForOneSwap,
+		uint256 _amountIn,
+		uint256 _minAmountOutConvert,
+		uint256 _minAmountOutSwap
+	) public onlyOwner returns (bool success) {
 		success = swap(_convertPool, _zeroForOneConvert, _amountIn, _minAmountOutConvert);
 		if (success) {
 			address tokenOut = _zeroForOneConvert ? _swapPool.token0 : _swapPool.token1;
@@ -168,13 +210,22 @@ contract ArbiCrypto is Ownable {
 		}
 	}
 
-	function convertSwapAndTransfer(Pool calldata _convertPool, bool _zeroForOneConvert, Pool calldata _swapPool, bool _zeroForOneSwap, uint256 _amountIn, uint256 _minAmountOutConvert, uint256 _minAmountOutSwap, address _recipient) public onlyOwner returns (bool success) {
-		success = convertAndSwap(_convertPool, _zeroForOneConvert, _swapPool, _zeroForOneSwap, _amountIn, _minAmountOutConvert, _minAmountOutSwap);
-		if (success) {
-			address tokenOut = _zeroForOneSwap ? _swapPool.token1 : _swapPool.token0;
-			transferToken(tokenOut, _recipient);
-		}
-	}
+	// function convertSwapAndTransfer(
+	// 	Pool calldata _convertPool,
+	// 	bool _zeroForOneConvert,
+	// 	Pool calldata _swapPool,
+	// 	bool _zeroForOneSwap,
+	// 	uint256 _amountIn,
+	// 	uint256 _minAmountOutConvert,
+	// 	uint256 _minAmountOutSwap,
+	// 	address _recipient
+	// ) public onlyOwner returns (bool success) {
+	// 	success = convertAndSwap(_convertPool, _zeroForOneConvert, _swapPool, _zeroForOneSwap, _amountIn, _minAmountOutConvert, _minAmountOutSwap);
+	// 	if (success) {
+	// 		address tokenOut = _zeroForOneSwap ? _swapPool.token1 : _swapPool.token0;
+	// 		transferAllOfToken(tokenOut, _recipient);
+	// 	}
+	// }
 
 	function swapInternal(
 		Pool calldata _pool,
@@ -193,14 +244,17 @@ contract ArbiCrypto is Ownable {
 			IERC20(path[0]).forceApprove(_pool.router, type(uint256).max);
 		}
 
-		uint256 balanceBeforeSwap = IERC20(path[1]).balanceOf(address(this));
+		// address destAddress = address(this.owner());
+		address destAddress = address(this);
+
+		uint256 balanceBeforeSwap = IERC20(path[1]).balanceOf(destAddress);
 
 		if (_pool.poolType == PoolType.UNISWAP_V2) {
 			ISwapRouterV2(_pool.router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
 				_amountIn,
 				_minAmountOut,
 				path,
-				address(this),
+				destAddress,
 				block.timestamp + 60
 			);
 		} else if (_pool.poolType == PoolType.UNISWAP_V3) {
@@ -208,7 +262,7 @@ contract ArbiCrypto is Ownable {
 				path[0],
 				path[1],
 				_pool.fee,
-				address(this),
+				destAddress,
 				_amountIn,
 				0,
 				0
@@ -219,7 +273,7 @@ contract ArbiCrypto is Ownable {
 				path[0],
 				path[1],
 				_pool.fee,
-				address(this),
+				destAddress,
 				block.timestamp + 60,
 				_amountIn,
 				0,
@@ -230,7 +284,7 @@ contract ArbiCrypto is Ownable {
 			revert("PoolType not supported");
 		}
 
-		amountOut = getTokenBalance(path[1], address(this)) - balanceBeforeSwap;
+		amountOut = getTokenBalance(path[1], destAddress) - balanceBeforeSwap;
 
 		if (amountOut == 0) {
 			revert("No token received after swap");
@@ -249,11 +303,26 @@ contract ArbiCrypto is Ownable {
 		IERC20(_pool.token0).forceApprove(_pool.router, type(uint256).max);
 		IERC20(_pool.token1).forceApprove(_pool.router, type(uint256).max);
 
+		console.log("bilancio token0: ", IERC20(_pool.token0).balanceOf(address(this)));
+		console.log("bilancio token1: ", IERC20(_pool.token1).balanceOf(address(this)));
+		console.log("bilancio token0 owner: ", IERC20(_pool.token0).balanceOf(address(this.owner())));
+		console.log("bilancio token1 owner: ", IERC20(_pool.token1).balanceOf(address(this.owner())));
+		console.log("allownace token 0", IERC20(_pool.token0).allowance(address(this), _pool.router));
+		console.log("allownace token 1", IERC20(_pool.token1).allowance(address(this), _pool.router));
+		console.log("allownace token 0 owner: ", IERC20(_pool.token0).allowance(address(this.owner()), _pool.router));
+		console.log("allownace token 1 owner: ", IERC20(_pool.token1).allowance(address(this.owner()), _pool.router));
+
 		uint8 tokenInDecimals = _zeroForOne ? _pool.token1Decimals : _pool.token0Decimals;
 		uint8 tokenOutDecimals = _zeroForOne ? _pool.token0Decimals : _pool.token1Decimals;
 
-		uint256 amountIn = 1 * (10 ** tokenOutDecimals);
-		uint256 amountOut = quote(_pool, !_zeroForOne, amountIn, false);
+		uint256 amountIn = 1000000000000000000000000; // * (10 ** tokenOutDecimals);
+		uint256 amountOut = 0;
+		while (amountOut <= 1000) {
+			//			console.log("amountIn: ", amountIn);
+			amountOut = quote(_pool, !_zeroForOne, amountIn, false);
+			//			console.log("amountOut: ", amountOut);
+			amountIn *= 10;
+		}
 
 		uint256 ticker = getPrice18Decimals(amountIn, amountOut, tokenInDecimals, tokenOutDecimals);
 
@@ -268,20 +337,24 @@ contract ArbiCrypto is Ownable {
 			(amountIn, amountOut, rightLimit) = getAmountIn(_pool, !_zeroForOne, targetPrice, false, rightLimit);
 
 			book[i * 3] = targetPrice;
+			//			console.log("targetPrice: ", targetPrice);
 			book[(i * 3) + 1] = amountIn;
+			//			console.log("amountIn: ", amountIn);
 			book[(i * 3) + 2] = amountOut;
+			//			console.log("amountOut: ", amountOut);
 
 			if (amountIn > _maxTokenOut * (10 ** tokenOutDecimals)) {
 				break;
 			}
 		}
 
-		amountIn = (10 ** tokenInDecimals);
-
-		amountOut = 1;
-		while (amountOut < (10 ** tokenOutDecimals)) {
-			amountIn *= 10;
+		amountIn = 10000000000000000000000000000000000; // * (10 ** tokenOutDecimals);
+		amountOut = 0;
+		while (amountOut <= 1000) {
+			console.log("amountIn: ", amountIn);
 			amountOut = quote(_pool, _zeroForOne, amountIn, false);
+			console.log("amountOut: ", amountOut);
+			amountIn *= 10;
 		}
 
 		ticker = getPrice18Decimals(amountIn, amountOut, tokenOutDecimals, tokenInDecimals);
@@ -290,6 +363,12 @@ contract ArbiCrypto is Ownable {
 
 		for (uint i = 0; i < _increments.length; i++) {
 			targetPrice = incrementPriceByPercent(ticker, _increments[i]);
+
+			console.log("--------- START IN BID BOOK --------");
+			console.log("amountIn: ", amountIn);
+			console.log("amountOut: ", amountOut);
+			console.log("rightLimit: ", rightLimit);
+			console.log("------------ END IN BID BOOK --------");
 
 			(amountIn, amountOut, rightLimit) = getAmountIn(_pool, _zeroForOne, targetPrice, false, rightLimit);
 
@@ -301,7 +380,6 @@ contract ArbiCrypto is Ownable {
 				break;
 			}
 		}
-
 		return book;
 	}
 
@@ -327,7 +405,13 @@ contract ArbiCrypto is Ownable {
 				break;
 			}
 
+			console.log("--- IN GET AMOUNT IN ---");
+			console.log("rightMax: ", rightMax);
+
 			uint256 out = quote(_pool, _zeroForOne, rightMax, _approve);
+
+			console.log("quote: ", out);
+			console.log("----- FIRST END IN GET AMOUNT IN  ----");
 
 			if (out == 1) {
 				newRight = rightMax * 10;
@@ -339,6 +423,11 @@ contract ArbiCrypto is Ownable {
 			}
 
 			uint256 price = getPrice18Decimals(rightMax, out, tokenOutDecimals, tokenInDecimals);
+
+			console.log("get price: ", price);
+			console.log("target price: ", _targetPrice);
+
+			console.log("---- SECOND END IN GET AMOUNT IN ---");
 
 			if (price > _targetPrice || rightMax == maxAmount) {
 				break;
@@ -354,7 +443,7 @@ contract ArbiCrypto is Ownable {
 
 		uint256 right = rightMax;
 
-		uint256 tolerance = 10 ** tokenInDecimals;
+		uint256 tolerance = 10 ** (tokenInDecimals / 2);
 
 		while (right - left > tolerance) {
 			uint256 mid = left + (right - left) / 2;
@@ -404,12 +493,5 @@ contract ArbiCrypto is Ownable {
 		require(incrementedPrice >= price, "Overflow occurred");
 
 		return incrementedPrice;
-	}
-
-	function getContractBalances(address[] calldata _tokens) external view returns (uint256[] memory balances) {
-		balances =  new uint256[](_tokens.length);
-		for (uint256 i = 0; i < _tokens.length; i++) {
-			balances[i] = getTokenBalance(_tokens[i], address(this));
-		}
 	}
 }
