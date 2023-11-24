@@ -123,7 +123,7 @@ contract ArbiCrypto is Ownable {
 		return IERC20Extended(_token).decimals();
 	}
 
-function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _approve) public onlyOwner returns (uint256) {
+	function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _approve) public onlyOwner returns (uint256 amountOut, bool reverted) {
 		bytes memory data = abi.encodeWithSignature(
 			"swapInternal((uint8,address,address,address,uint8,uint8,uint24,address),bool,uint256,uint256,bool,bool)",
 			_pool,
@@ -135,6 +135,7 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 		);
 
 		bytes memory returnData;
+		bytes memory errorData;
 		bool success;
 
 		assembly {
@@ -142,28 +143,42 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 			success := delegatecall(gas(), address(), add(data, 0x20), mload(data), outPtr, 0)
 			let size := returndatasize()
 			mstore(0x40, add(outPtr, and(add(size, 0x1f), not(0x1f))))
-			if gt(size, 0) {
-				if gt(size, 0x20) {
-					returndatacopy(outPtr, 0, size)
-					revert(outPtr, size)
-				}
+			if eq(size, 0x20) {
 				mstore(outPtr, size)
 				returndatacopy(add(outPtr, 0x20), 0, size)
 				returnData := outPtr
+				reverted := false
 			}
-			if eq(size, 0) {
-				let revertPtr := mload(0x40)
-				mstore(revertPtr, 0x08c379a000000000000000000000000000000000000000000000000000000000)
-				mstore(add(revertPtr, 0x04), 0x20) // String offset
-				mstore(add(revertPtr, 0x24), 14) // Revert reason length
-				mstore(add(revertPtr, 0x44), "Return size 0.")
-				revert(revertPtr, 0x64) // Revert data length is 4 bytes for selector and 3 slots of 0x20 bytes
+			if iszero(eq(size, 0x20)) {
+				if gt(size, 0x20) {
+					returndatacopy(outPtr, 0, size)
+					errorData := add(outPtr, 0x24)
+				}
+				if lt(size, 0x20) {
+					let revertPtr := mload(0x40)
+					mstore(revertPtr, 0x08c379a000000000000000000000000000000000000000000000000000000000)
+					mstore(add(revertPtr, 0x04), 0x20) // String offset
+					mstore(add(revertPtr, 0x24), 14) // Revert reason length
+					mstore(add(revertPtr, 0x44), "Return size 0.")
+					//					revert(revertPtr, 0x64) // Revert data length is 4 bytes for selector and 3 slots of 0x20 bytes
+					errorData := add(revertPtr, 0x24)
+				}
+				let returnZeroPtr := mload(0x040)
+				mstore(returnZeroPtr, 0x20)
+				mstore(add(returnZeroPtr, 0x20), 0)
+				returnData := returnZeroPtr
+				reverted := true
 			}
+		}
+
+		if (reverted) {
+			string memory revertReason = string(abi.encodePacked(errorData));
+			console.log("delegateCall reverted. Reason: ", revertReason);
 		}
 
 		require(!success, "Error, expected swap to revert.");
 
-		return abi.decode(returnData, (uint256));
+		amountOut = abi.decode(returnData, (uint256));
 	}
 
 	function swap(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, uint256 _minAmountOut) public onlyOwner returns (bool success) {
@@ -245,8 +260,8 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 			IERC20(path[0]).forceApprove(_pool.router, type(uint256).max);
 		}
 
-		// address destAddress = address(this.owner());
-		address destAddress = address(this);
+		address destAddress = address(this.owner());
+		//address destAddress = address(this);
 
 		uint256 balanceBeforeSwap = IERC20(path[1]).balanceOf(destAddress);
 
@@ -320,7 +335,7 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 		uint256 amountOut = 0;
 		while (amountOut <= 1000) {
 			//			console.log("amountIn: ", amountIn);
-			amountOut = quote(_pool, !_zeroForOne, amountIn, false);
+			(amountOut, ) = quote(_pool, !_zeroForOne, amountIn, false);
 			//			console.log("amountOut: ", amountOut);
 			amountIn *= 10;
 		}
@@ -353,7 +368,7 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 		amountOut = 0;
 		while (amountOut <= 1000) {
 			console.log("amountIn: ", amountIn);
-			amountOut = quote(_pool, _zeroForOne, amountIn, false);
+			(amountOut, ) = quote(_pool, _zeroForOne, amountIn, false);
 			console.log("amountOut: ", amountOut);
 			amountIn *= 10;
 		}
@@ -409,7 +424,7 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 			console.log("--- IN GET AMOUNT IN ---");
 			console.log("rightMax: ", rightMax);
 
-			uint256 out = quote(_pool, _zeroForOne, rightMax, _approve);
+			(uint256 out, ) = quote(_pool, _zeroForOne, rightMax, _approve);
 
 			console.log("quote: ", out);
 			console.log("----- FIRST END IN GET AMOUNT IN  ----");
@@ -449,7 +464,7 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 		while (right - left > tolerance) {
 			uint256 mid = left + (right - left) / 2;
 
-			amountOut = quote(_pool, _zeroForOne, mid, _approve);
+			(amountOut, ) = quote(_pool, _zeroForOne, mid, _approve);
 			uint256 price = getPrice18Decimals(mid, amountOut, tokenOutDecimals, tokenInDecimals);
 
 			if (price > _targetPrice) {
