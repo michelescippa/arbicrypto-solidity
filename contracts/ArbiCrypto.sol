@@ -103,10 +103,10 @@ contract ArbiCrypto is Ownable {
 		IERC20(_token).transfer(_recipient, _amount);
 	}
 
-	// function transferAllOfToken(address _token, address _recipient) public onlyOwner {
-	// 	uint256 balance = IERC20(_token).balanceOf(address(this));
-	// 	IERC20(_token).transfer(_recipient, balance);
-	// }
+	function transferAllOfToken(address _token, address _recipient) public onlyOwner {
+		uint256 balance = IERC20(_token).balanceOf(address(this));
+		IERC20(_token).transfer(_recipient, balance);
+	}
 
 	function getTokenBalance(address _token, address _address) public view returns (uint256) {
 		return IERC20(_token).balanceOf(_address);
@@ -144,6 +144,7 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 			mstore(0x40, add(outPtr, and(add(size, 0x1f), not(0x1f))))
 			if gt(size, 0) {
 				if gt(size, 0x20) {
+					returndatacopy(outPtr, 0, size)
 					revert(outPtr, size)
 				}
 				mstore(outPtr, size)
@@ -179,19 +180,19 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 		(success, ) = address(this).delegatecall(data);
 	}
 
-	// function swapAndTransfer(
-	// 	Pool calldata _pool,
-	// 	bool _zeroForOne,
-	// 	uint256 _amountIn,
-	// 	uint256 _minAmountOut,
-	// 	address _recipient
-	// ) public onlyOwner returns (bool success) {
-	// 	success = swap(_pool, _zeroForOne, _amountIn, _minAmountOut);
-	// 	if (success) {
-	// 		address tokenOut = _zeroForOne ? _pool.token0 : _pool.token1;
-	// 		transferAllOfToken(tokenOut, _recipient);
-	// 	}
-	// }
+	function swapAndTransfer(
+		Pool calldata _pool,
+		bool _zeroForOne,
+		uint256 _amountIn,
+		uint256 _minAmountOut,
+		address _recipient
+	) public onlyOwner returns (bool success) {
+		success = swap(_pool, _zeroForOne, _amountIn, _minAmountOut);
+		if (success) {
+			address tokenOut = _zeroForOne ? _pool.token0 : _pool.token1;
+			transferAllOfToken(tokenOut, _recipient);
+		}
+	}
 
 	function convertAndSwap(
 		Pool calldata _convertPool,
@@ -210,22 +211,22 @@ function quote(Pool calldata _pool, bool _zeroForOne, uint256 _amountIn, bool _a
 		}
 	}
 
-	// function convertSwapAndTransfer(
-	// 	Pool calldata _convertPool,
-	// 	bool _zeroForOneConvert,
-	// 	Pool calldata _swapPool,
-	// 	bool _zeroForOneSwap,
-	// 	uint256 _amountIn,
-	// 	uint256 _minAmountOutConvert,
-	// 	uint256 _minAmountOutSwap,
-	// 	address _recipient
-	// ) public onlyOwner returns (bool success) {
-	// 	success = convertAndSwap(_convertPool, _zeroForOneConvert, _swapPool, _zeroForOneSwap, _amountIn, _minAmountOutConvert, _minAmountOutSwap);
-	// 	if (success) {
-	// 		address tokenOut = _zeroForOneSwap ? _swapPool.token1 : _swapPool.token0;
-	// 		transferAllOfToken(tokenOut, _recipient);
-	// 	}
-	// }
+	function convertSwapAndTransfer(
+		Pool calldata _convertPool,
+		bool _zeroForOneConvert,
+		Pool calldata _swapPool,
+		bool _zeroForOneSwap,
+		uint256 _amountIn,
+		uint256 _minAmountOutConvert,
+		uint256 _minAmountOutSwap,
+		address _recipient
+	) public onlyOwner returns (bool success) {
+		success = convertAndSwap(_convertPool, _zeroForOneConvert, _swapPool, _zeroForOneSwap, _amountIn, _minAmountOutConvert, _minAmountOutSwap);
+		if (success) {
+			address tokenOut = _zeroForOneSwap ? _swapPool.token1 : _swapPool.token0;
+			transferAllOfToken(tokenOut, _recipient);
+		}
+	}
 
 	function swapInternal(
 		Pool calldata _pool,
