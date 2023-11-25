@@ -160,12 +160,14 @@ contract ArbiCrypto is Ownable {
 					mstore(add(revertPtr, 0x04), 0x20) // String offset
 					mstore(add(revertPtr, 0x24), 14) // Revert reason length
 					mstore(add(revertPtr, 0x44), "Return size 0.")
+					mstore(0x40, add(revertPtr, 0x64))
 					//					revert(revertPtr, 0x64) // Revert data length is 4 bytes for selector and 3 slots of 0x20 bytes
 					errorData := add(revertPtr, 0x24)
 				}
-				let returnZeroPtr := mload(0x040)
+				let returnZeroPtr := mload(0x40)
 				mstore(returnZeroPtr, 0x20)
 				mstore(add(returnZeroPtr, 0x20), 0)
+				mstore(0x40, add(returnZeroPtr, 0x40))
 				returnData := returnZeroPtr
 				reverted := true
 			}
@@ -331,21 +333,25 @@ contract ArbiCrypto is Ownable {
 		uint8 tokenInDecimals = _zeroForOne ? _pool.token1Decimals : _pool.token0Decimals;
 		uint8 tokenOutDecimals = _zeroForOne ? _pool.token0Decimals : _pool.token1Decimals;
 
-		uint256 amountIn = 1000000000000000000000000; // * (10 ** tokenOutDecimals);
-		uint256 amountOut = 0;
-		while (amountOut <= 1000) {
-			//			console.log("amountIn: ", amountIn);
-			(amountOut, ) = quote(_pool, !_zeroForOne, amountIn, false);
-			//			console.log("amountOut: ", amountOut);
-			amountIn *= 10;
-		}
+		uint256[] memory book = new uint256[](_increments.length * 3 * 2);
+		
+		
+		console.log("--->> STARTING ASKS BOOK");
 
-		uint256 ticker = getPrice18Decimals(amountIn, amountOut, tokenInDecimals, tokenOutDecimals);
+		uint256 ticker = getTicker(_pool, _zeroForOne, false);
+		console.log("ticker askBook: ", ticker);
 
 		uint256 targetPrice;
+		
+
+		uint256 amountIn;
+		uint256 amountOut;
 		uint256 rightLimit = 0;
 
-		uint256[] memory book = new uint256[](_increments.length * 3 * 2);
+	
+
+
+
 
 		for (uint i = 0; i < _increments.length; i++) {
 			targetPrice = incrementPriceByPercent(ticker, _increments[i]);
@@ -364,27 +370,16 @@ contract ArbiCrypto is Ownable {
 			}
 		}
 
-		amountIn = 10000000000000000000000000000000000; // * (10 ** tokenOutDecimals);
-		amountOut = 0;
-		while (amountOut <= 1000) {
-			console.log("amountIn: ", amountIn);
-			(amountOut, ) = quote(_pool, _zeroForOne, amountIn, false);
-			console.log("amountOut: ", amountOut);
-			amountIn *= 10;
-		}
 
-		ticker = getPrice18Decimals(amountIn, amountOut, tokenOutDecimals, tokenInDecimals);
+		console.log("--->> STARTING BIDS BOOK");
 
-		rightLimit = amountIn;
+		ticker = getTicker(_pool, !_zeroForOne, false);
+		console.log("ticker bidBook: ", ticker);
+
+		rightLimit = 0;
 
 		for (uint i = 0; i < _increments.length; i++) {
 			targetPrice = incrementPriceByPercent(ticker, _increments[i]);
-
-			console.log("--------- START IN BID BOOK --------");
-			console.log("amountIn: ", amountIn);
-			console.log("amountOut: ", amountOut);
-			console.log("rightLimit: ", rightLimit);
-			console.log("------------ END IN BID BOOK --------");
 
 			(amountIn, amountOut, rightLimit) = getAmountIn(_pool, _zeroForOne, targetPrice, false, rightLimit);
 
@@ -421,13 +416,13 @@ contract ArbiCrypto is Ownable {
 				break;
 			}
 
-			console.log("--- IN GET AMOUNT IN ---");
-			console.log("rightMax: ", rightMax);
+			// console.log("--- IN GET AMOUNT IN ---");
+			// console.log("rightMax: ", rightMax);
 
 			(uint256 out, ) = quote(_pool, _zeroForOne, rightMax, _approve);
 
-			console.log("quote: ", out);
-			console.log("----- FIRST END IN GET AMOUNT IN  ----");
+			// console.log("quote: ", out);
+			// console.log("----- FIRST END IN GET AMOUNT IN  ----");
 
 			if (out == 1) {
 				newRight = rightMax * 10;
@@ -440,10 +435,10 @@ contract ArbiCrypto is Ownable {
 
 			uint256 price = getPrice18Decimals(rightMax, out, tokenOutDecimals, tokenInDecimals);
 
-			console.log("get price: ", price);
-			console.log("target price: ", _targetPrice);
+			// console.log("get price: ", price);
+			// console.log("target price: ", _targetPrice);
 
-			console.log("---- SECOND END IN GET AMOUNT IN ---");
+			// console.log("---- SECOND END IN GET AMOUNT IN ---");
 
 			if (price > _targetPrice || rightMax == maxAmount) {
 				break;
@@ -509,5 +504,47 @@ contract ArbiCrypto is Ownable {
 		require(incrementedPrice >= price, "Overflow occurred");
 
 		return incrementedPrice;
+	}
+
+	function getTicker(Pool calldata _pool, bool _zeroForOne, bool _approve) public returns (uint256) {
+
+		uint8 tokenInDecimals = _zeroForOne ? _pool.token1Decimals : _pool.token0Decimals;
+		uint8 tokenOutDecimals = _zeroForOne ? _pool.token0Decimals : _pool.token1Decimals;
+
+		uint256 amountIn = 1;
+		uint256 amountOut = 0;
+		bool reverted = true;
+		bool prevReverted = true;
+		uint256 ticker = 0;
+		uint256 prevTicker = 0;
+
+		while(amountIn < (type(uint256).max / 10)) {
+			console.log("amountIn : ", amountIn);
+
+			(amountOut, reverted) = quote(_pool, !_zeroForOne, amountIn, _approve);
+
+			console.log("amountOut : ", amountOut);
+			console.log("reverted : ", reverted);
+
+
+			if (reverted == true && prevReverted == false) {
+				break;
+			}
+			prevReverted = reverted;
+			
+			if (amountOut > 0) {
+				ticker = getPrice18Decimals(amountIn, amountOut, tokenInDecimals, tokenOutDecimals);
+
+				console.log("ticker : ", ticker);
+				console.log("prevTicker : ", prevTicker);
+
+				if ((ticker > incrementPriceByPercent(prevTicker, 1) && prevTicker != 0)|| ticker == prevTicker) break;
+				prevTicker = ticker;
+			}
+
+			amountIn *= 10;
+		}
+		console.log("exited with ticker: ", prevTicker);
+		return prevTicker;
 	}
 }

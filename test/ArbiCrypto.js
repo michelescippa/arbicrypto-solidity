@@ -213,7 +213,7 @@ describe("ArbiCrypto contract Unit Tests", function () {
         const zeroForOne = true;
 
         
-        const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [1, 3, 5], 50]);
+        const callData = arbicrypto.interface.encodeFunctionData("getBook", [Pool, zeroForOne, [3, 5, 10], 10000]);
         const newBalance = BigInt(ethers.MaxUint256.toString()) / BigInt(1000000);
  //       const newBalance = ethers.MaxUint256;
         const token0BalanceSlotHex = ethers.toBeHex(token0BalanceSlot, 32);
